@@ -1,0 +1,17 @@
+{
+  "extends": [
+    "config:best-practices"
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["io.quarkus.qute:qute-core"],
+      "allowedVersions": "<2.0.0"
+    },
+    {
+      "groupName": "{{manager}}",
+      "matchPackageNames": [
+        "*"
+      ]
+    }
+  ]
+}

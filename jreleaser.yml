@@ -1,0 +1,118 @@
+project:
+  name: jbang
+  description: Unleash the power of Java
+  longDescription: |
+    Unleash the power of Java.
+    Use `jbang` to run java, jar, jsh or kt file(s) with automatic dependency fetching
+    and immediate compilation and execution.
+  links:
+    homepage: https://jbang.dev
+    documentation: https://jbang.dev/documentation
+    license: https://github.com/jbangdev/jbang/blob/main/LICENSE
+  authors:
+    - Max Rydahl Andersen
+  license: MIT
+  tags:
+    - jbang
+    - bash
+    - java
+    - shell
+    - scripting
+  java:
+    groupId: dev.jbang
+    version: 8
+  inceptionYear: 2020
+  stereotype: CLI
+
+release:
+  github:
+    overwrite: true
+    draft: true
+    sign: true
+    releaseName: '{{tagName}}'
+    skipTag: true
+    milestone:
+      close: false
+    changelog:
+      formatted: always
+      preset: "conventional-commits"
+      format: '- {{commitShortHash}} {{commitTitle}}'
+
+checksum:
+  individual: true
+
+signing:
+  active: ALWAYS
+  armored: true
+
+deploy:
+  maven:
+    nexus2:
+      maven-central:
+        active: ALWAYS
+        url: https://oss.sonatype.org/service/local
+        snapshotUrl: https://oss.sonatype.org/content/repositories/snapshots/
+        closeRepository: true
+        releaseRepository: true
+        stagingRepositories:
+          - build/staging-deploy
+
+announce:
+  twitter:
+    active: RELEASE
+    status: 'JBang {{projectVersion}} has been released! {{releaseNotesUrl}}'
+  sdkman:
+    active: RELEASE
+  article:
+    active: RELEASE
+    repository:
+      name: jbang.dev
+    files:
+      - path: 'blogpost.adoc'
+        transform: '_drafts/{{projectName}}-{{#f_dash}}{{projectVersion}}{{/f_dash}}-released.adoc'
+
+files:
+  artifacts:
+    - path: build/tmp/version.txt
+    - path: build/distributions/jbang.zip
+    - path: build/distributions/jbang.tar
+
+distributions:
+  jbang:
+    executable:
+      windowsExtension: cmd
+    docker:  ## not ready to release this way.
+      active: RELEASE
+      continueOnError: true
+      postCommands:
+        - "VOLUME /scripts"
+      baseImage: "adoptopenjdk:11-jdk-hotspot"
+      repository:
+        name: jbang-action
+    sdkman:
+      active: RELEASE
+      continueOnError: true
+    brew:
+      active: RELEASE
+      continueOnError: true
+      extraProperties:
+        skipJava: true
+    scoop:
+      active: RELEASE
+      continueOnError: true
+      bucket:
+        name: 'scoop-bucket'
+    chocolatey:
+      active: RELEASE
+      continueOnError: true
+      remoteBuild: true
+      title: JBang
+    snap:
+      active: RELEASE
+      continueOnError: true
+      remoteBuild: true
+      base: core18
+      confinement: classic
+    artifacts:
+      - path: build/distributions/jbang-{{projectVersion}}.zip
+      - path: build/distributions/jbang-{{projectVersion}}.tar
