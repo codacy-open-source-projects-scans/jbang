@@ -48,6 +48,7 @@ public class ArtifactResolver implements Closeable {
 		private List<MavenRepo> repositories;
 		private int timeout;
 		private boolean offline;
+		private boolean ignoreTransitiveRepositories;
 		private boolean withUserSettings;
 		private Path localFolder;
 		private Path settingsXml;
@@ -98,6 +99,11 @@ public class ArtifactResolver implements Closeable {
 			return this;
 		}
 
+		public Builder ignoreTransitiveRepositories(boolean ignoreTransitiveRepositories) {
+			this.ignoreTransitiveRepositories = ignoreTransitiveRepositories;
+			return this;
+		}
+
 		public Builder logging(boolean logging) {
 			this.loggingEnabled = logging;
 			return this;
@@ -132,6 +138,8 @@ public class ArtifactResolver implements Closeable {
 		ContextOverrides.Builder overridesBuilder = ContextOverrides.create()
 																	.userProperties(userProperties)
 																	.offline(builder.offline)
+																	.ignoreArtifactDescriptorRepositories(
+																			builder.ignoreTransitiveRepositories)
 																	.withUserSettings(builder.withUserSettings)
 																	.withUserSettingsXmlOverride(builder.settingsXml)
 																	.withLocalRepositoryOverride(builder.localFolder)
@@ -182,16 +190,19 @@ public class ArtifactResolver implements Closeable {
 															.collect(Collectors.groupingBy(Dependency::getScope));
 
 			List<Dependency> deps = scopeDeps.get(JavaScopes.COMPILE);
-			List<Dependency> managedDeps = null;
+			List<Dependency> managedDeps = deps	.stream()
+												.flatMap(d -> getManagedDependencies(d).stream())
+												.collect(Collectors.toList());
+
 			if (scopeDeps.containsKey("import")) {
 				// If there are any @pom artifacts we'll apply their
-				// managed dependencies to the given dependencies
+				// managed dependencies to the given dependencies BEFORE ordinary deps
 				List<Dependency> boms = scopeDeps.get("import");
 				List<Dependency> mdeps = boms	.stream()
 												.flatMap(d -> getManagedDependencies(d).stream())
 												.collect(Collectors.toList());
 				deps = deps.stream().map(d -> applyManagedDependencies(d, mdeps)).collect(Collectors.toList());
-				managedDeps = mdeps;
+				managedDeps.addAll(0, mdeps);
 			}
 
 			CollectRequest collectRequest = new CollectRequest()

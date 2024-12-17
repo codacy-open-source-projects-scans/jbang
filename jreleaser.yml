@@ -58,9 +58,11 @@ deploy:
           - build/staging-deploy
 
 announce:
-  twitter:
+  bluesky:
     active: RELEASE
     status: 'JBang {{projectVersion}} has been released! {{releaseNotesUrl}}'
+    handle: 'jbang.dev'
+    host: https://bsky.social
   sdkman:
     active: RELEASE
   article:

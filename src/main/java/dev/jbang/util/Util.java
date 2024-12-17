@@ -92,6 +92,7 @@ public class Util {
 	private static boolean quiet;
 	private static boolean offline;
 	private static boolean fresh;
+	private static boolean ignoreTransitiveRepositories;
 	private static boolean preview;
 
 	private static Path cwd;
@@ -127,6 +128,10 @@ public class Util {
 		}
 	}
 
+	public static void setIgnoreTransitiveRepositories(boolean ignoreTransitiveRepositories) {
+		Util.ignoreTransitiveRepositories = ignoreTransitiveRepositories;
+	}
+
 	public static void setDownloadSources(boolean flag) {
 		downloadSources = flag;
 	}
@@ -140,6 +145,10 @@ public class Util {
 
 	public static boolean isOffline() {
 		return offline;
+	}
+
+	public static boolean isIgnoreTransitiveRepositories() {
+		return ignoreTransitiveRepositories;
 	}
 
 	public static void setFresh(boolean fresh) {
@@ -467,7 +476,7 @@ public class Util {
 			if (msg != null) {
 				infoMsg(e.getMessage());
 			}
-			infoMsg("Run with --verbose for more details");
+			infoMsg("Run with --verbose for more details. The --verbose must be placed before the jbang command. I.e. jbang --verbose run [...]");
 		}
 	}
 
@@ -588,11 +597,12 @@ public class Util {
 	 */
 	public static Path swizzleContent(String fileURL, Path filePath) throws IOException {
 		boolean mastodon = fileURL.matches("https://.*/@(\\w+)/([0-9]+)");
-		if (mastodon || fileURL.startsWith("https://carbon.now.sh")) { // sites known
-																		// to have
-																		// og:description
-																		// meta name or
-																		// property
+		if (mastodon || fileURL.startsWith("https://carbon.now.sh") || fileURL.startsWith("https://bsky.app/")) { // sites
+																													// known
+			// to have
+			// og:description
+			// meta name or
+			// property
 			try {
 				Document doc = Jsoup.parse(filePath.toFile(), "UTF-8", fileURL);
 

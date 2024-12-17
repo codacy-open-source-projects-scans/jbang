@@ -52,6 +52,7 @@ public class ProjectBuilder {
 	private Map<String, String> manifestOptions = new HashMap<>();
 	private File catalogFile;
 	private Boolean nativeImage;
+	private Boolean integrations;
 	private String javaVersion;
 	private Boolean enablePreview;
 
@@ -169,6 +170,11 @@ public class ProjectBuilder {
 
 	public ProjectBuilder nativeImage(Boolean nativeImage) {
 		this.nativeImage = nativeImage;
+		return this;
+	}
+
+	public ProjectBuilder integrations(Boolean integrations) {
+		this.integrations = integrations;
 		return this;
 	}
 
@@ -429,6 +435,9 @@ public class ProjectBuilder {
 		if (nativeImage != null) {
 			prj.setNativeImage(nativeImage);
 		}
+		if (integrations != null) {
+			prj.setIntegrations(integrations);
+		}
 		if (enablePreview != null) {
 			prj.setEnablePreviewRequested(enablePreview);
 		}
@@ -471,7 +480,11 @@ public class ProjectBuilder {
 		prj.setMainClass(src.tagReader.getMain().orElse(null));
 		prj.setModuleName(src.tagReader.getModule().orElse(null));
 		if (prj.getMainSource() instanceof JavaSource) {
+			// todo: have way to turn these off? lets wait until someone asks and has a
+			// usecase
+			// where ability to debug and support named parameters is bad.
 			prj.getMainSourceSet().addCompileOption("-g");
+			prj.getMainSourceSet().addCompileOption("-parameters");
 		}
 		return updateProject(src, prj, resolver);
 	}
@@ -590,6 +603,9 @@ public class ProjectBuilder {
 		}
 		if (nativeOptions.isEmpty()) {
 			nativeOptions(alias.nativeOptions);
+		}
+		if (integrations == null) {
+			integrations(alias.integrations);
 		}
 		if (manifestOptions.isEmpty()) {
 			manifestOptions(alias.manifestOptions);

@@ -882,6 +882,25 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "wfouche",
+      "name": "Werner Fouché",
+      "avatar_url": "https://avatars.githubusercontent.com/u/13682850?v=4",
+      "profile": "https://github.com/wfouche",
+      "contributions": [
+        "code",
+        "doc"
+      ]
+    },
+    {
+      "login": "yostane",
+      "name": "Yassine Benabbas",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1958676?v=4",
+      "profile": "https://github.com/yostane",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "skipCi": true,

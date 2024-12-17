@@ -9,7 +9,19 @@ import static dev.jbang.util.Util.writeString;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.hasXPath;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.matchesRegex;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -20,7 +32,11 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.nio.file.*;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -227,6 +243,26 @@ public class TestRun extends BaseTest {
 	@Test
 	void testMarkdown() throws IOException {
 		String arg = examplesTestFolder.resolve("readme.md").toAbsolutePath().toString();
+		CommandLine.ParseResult pr = JBang.getCommandLine().parseArgs("run", arg);
+		Run run = (Run) pr.subcommand().commandSpec().userObject();
+
+		ProjectBuilder pb = run.createProjectBuilderForRun();
+		Project prj = pb.build(arg);
+
+		String result = run.updateGeneratorForRun(CmdGenerator.builder(prj)).build().generate();
+
+		assertThat(result, matchesPattern("^.*jshell(.exe)?.+--class-path=.*figlet.*? --startup.*$"));
+	}
+
+	@Test
+	void testMarkdownWindows() throws IOException {
+		Path readmeFileOrg = examplesTestFolder.resolve("readme.md");
+		String readmeText = Util.readString(readmeFileOrg);
+
+		Path readmeFileWin = jbangTempDir.resolve("readme.md");
+		Files.write(readmeFileWin, readmeText.replace("\n", "\r\n").getBytes());
+
+		String arg = readmeFileWin.toAbsolutePath().toString();
 		CommandLine.ParseResult pr = JBang.getCommandLine().parseArgs("run", arg);
 		Run run = (Run) pr.subcommand().commandSpec().userObject();
 
@@ -1109,6 +1145,12 @@ public class TestRun extends BaseTest {
 	}
 
 	@Test
+	void testFetchFromBluesky(@TempDir Path dir) throws IOException {
+
+		verifyHello("https://bsky.app/profile/maxandersen.xam.dk/post/3lb2vbnfpns24", dir, false);
+	}
+
+	@Test
 	void testFetchFromMastdon(@TempDir Path dir) throws IOException {
 		verifyHello("https://mastodon.social/@maxandersen/109361828562755062", dir);
 		verifyHello("https://fosstodon.org/@jbangdev/109367735752497165", dir);
@@ -1123,11 +1165,17 @@ public class TestRun extends BaseTest {
 	 */
 
 	private void verifyHello(String url, Path dir) throws IOException {
+		verifyHello(url, dir, true);
+	}
+
+	private void verifyHello(String url, Path dir, boolean expectFile) throws IOException {
 		String u = Util.swizzleURL(url);
 		Path x = Util.swizzleContent(u, Util.downloadFile(u, dir));
-		assertEquals("hello.java", x.getFileName().toString());
+		if (expectFile) {
+			assertEquals("hello.java", x.getFileName().toString());
+		}
 		String java = Util.readString(x);
-		assertThat(java, startsWith("//DEPS"));
+		assertThat(java, containsString("//DEPS"));
 		assertThat(java, not(containsString("&gt;")));
 		assertThat(java, containsString("\n"));
 	}
@@ -2301,6 +2349,52 @@ public class TestRun extends BaseTest {
 	}
 
 	@Test
+	void testBuildJbangProjectFolder() throws IOException {
+		environmentVariables.clear("JAVA_HOME");
+		String arg = examplesTestFolder.toAbsolutePath().toString();
+		CommandLine.ParseResult pr = JBang.getCommandLine().parseArgs("--preview", "run", arg);
+		Run run = (Run) pr.subcommand().commandSpec().userObject();
+
+		ProjectBuilder pb = run.createProjectBuilderForRun();
+		Project prj = pb.build(arg);
+		BuildContext ctx = BuildContext.forProject(prj);
+
+		new JavaSource.JavaAppBuilder(ctx) {
+			@Override
+			protected Builder<Project> getCompileBuildStep() {
+				return new JavaCompileBuildStep() {
+					@Override
+					protected void runCompiler(List<String> optionList) throws IOException {
+						// Make sure the file "build.jbang" isn't passed to the compiler
+						assertThat(optionList.stream().filter(o -> o.contains("build.jbang")).count(), equalTo(1L));
+						super.runCompiler(optionList);
+					}
+				};
+			}
+		}.setFresh(true).build();
+
+		String result = run.updateGeneratorForRun(CmdGenerator.builder(prj)).build().generate();
+
+		assertThat(result, matchesPattern("^.*java(.exe)? .*$"));
+		assertThat(result, endsWith("quote_notags"));
+		assertThat(result, containsString("classpath"));
+		assertThat(result, matchesRegex(".*build\\.jbang\\.[a-z0-9]+.build.jbang.jar.*"));
+		assertThat(result, containsString("picocli-4.6.3.jar"));
+		assertThat(result, containsString("-Dfoo=bar"));
+		assertThat(result, containsString(CommandBuffer.escapeShellArgument("-Dbar=aap noot mies", Util.getShell())));
+		// Make sure the opts only appear once
+		assertThat(result.replaceFirst(Pattern.quote("-Dfoo=bar"), ""),
+				not(containsString("-Dfoo=bar")));
+		assertThat(result.replaceFirst(Pattern.quote("-Dbar=aap noot mies"), ""),
+				not(containsString("-Dbar=aap noot mies")));
+		// Make sure the opts only appear unquoted
+		assertThat(result,
+				not(containsString(
+						CommandBuffer.escapeShellArgument("-Dfoo=bar -Dbar=aap noot mies", Util.getShell()))));
+		// assertThat(result, containsString("--source 11"));
+	}
+
+	@Test
 	@SuppressWarnings("unchecked")
 	void testRemoteFileArgSimple() throws Exception {
 
@@ -2480,8 +2574,7 @@ public class TestRun extends BaseTest {
 		File f = examplesTestFolder.resolve("echo.java").toFile();
 		List<String> args = Arrays.asList("foo", "bar");
 		Alias alias = new Alias(f.toString(), null, args, null, null, null, null, null, null, null, null, null, null,
-				null, null, null, null, null,
-				null, null, null, null, null, null, null, null);
+				null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 		CatalogUtil.addNearestAlias("echo", alias);
 
 		CommandLine.ParseResult pr = JBang	.getCommandLine()
@@ -2522,5 +2615,4 @@ public class TestRun extends BaseTest {
 		String arg = examplesTestFolder.resolve("helloworld.java").toAbsolutePath().toString();
 		CommandLine.ParseResult pr = JBang.getCommandLine().parseArgs("build", "-n", "-N=--verbose", arg);
 	}
-
 }
