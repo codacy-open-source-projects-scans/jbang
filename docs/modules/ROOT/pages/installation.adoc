@@ -1,0 +1,410 @@
+= Installation
+:idprefix:
+:idseparator: -
+ifndef::env-github[]
+:icons: font
+endif::[]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+toc::[]
+
+To use `jbang` Java 8 is the minimum required version, however Java 17 or higher is recommended.
+To use `jbang` Java 8 is the minimum required version, however Java 17 or higher is recommended.
+
+Note: `jbang` will download and install `java` from Eclipse Temurin if no `java` is available.
+Note: `jbang` will download and install `java` from Eclipse Temurin if no `java` is available.
+
+There are multiple ways to install jbang. See below for all available options.
+
+Once you have jbang installed, it is recommended you run `jbang app setup`. This script will make the following changes to your system:
+
+1. Modify `PATH` environment variable to include jbang app scripts
+2. For supported shells, add `j!` as an alias for `jbang`. Try running `j! version` to verify.
+
+[NOTE]
+====
+By default `jbang` uses `~/.jbang` for configurations and build cache. This can be changed using the environment variable `JBANG_DIR`.
+====
+
+== Installation Methods
+
+== Universal (All Platforms)
+
+=== Using JBang (curl/bash)
+
+Linux/OSX/Windows/AIX Bash:
+
+[source, bash]
+----
+curl -Ls https://sh.jbang.dev | bash -s - app setup
+----
+
+Windows Powershell:
+
+[source, powershell]
+----
+iex "& { $(iwr -useb https://ps.jbang.dev) } app setup"
+----
+
+=== Zero Install (curl/bash and Powershell)
+
+Linux/OSX/Windows/AIX Bash:
+
+[source, bash]
+----
+curl -Ls https://sh.jbang.dev | bash -s - <arguments>
+----
+
+For example `curl -Ls https://sh.jbang.dev | bash -s - properties@jbangdev`
+
+Windows Powershell:
+
+[source, powershell]
+----
+iex "& { $(iwr -useb https://ps.jbang.dev) } <arguments>"
+----
+
+For example `iex "& { $(iwr -useb https://ps.jbang.dev) } properties@jbangdev"`
+
+=== Manual install
+
+Unzip the https://github.com/jbangdev/jbang/releases/latest[latest binary release], add the `jbang-<version>/bin` folder to your `$PATH` and you are set.
+
+=== Wrapper install
+
+If you would like to have `jbang` available in a local directory and committed into a source code repository (akin to Maven and Gradle wrappers) you can use the `jbang wrapper` command.
+
+If you have `jbang` already installed you call `jbang wrapper install` in a folder to install a local `jbang`
+that will run out of that directory using `./jbang`.
+
+The `./.jbang` directory which `jbang wrapper install` creates is just a cache which you typically would not commit to a source code repository, so you can e.g. `echo .jbang/ >>.gitignore`.
+
+== Linux & macOS
+
+=== SDKMan
+
+Although if you want to have easy updates or install multiple JBang versions we recommend
+https://sdkman.io[sdkman] to install both java and `jbang` on Linux and OSX.
+
+[source, bash]
+----
+curl -s "https://get.sdkman.io" | bash # <.>
+source ~/.bash_profile # <.>
+
+sdk install java # <.>
+----
+
+Once Java is installed and ready, you install `jbang` with
+
+[source, bash]
+----
+sdk install jbang
+----
+
+To test your installation run:
+
+[source, bash]
+----
+jbang --help
+----
+
+This should print out usage information.
+
+To update run:
+
+[source, bash]
+----
+sdk upgrade jbang
+----
+
+=== asdf
+
+You can install JBang using the asdf version manager:
+
+[source,bash]
+----
+asdf plugin-add jbang
+asdf install jbang latest
+----
+
+=== Homebrew (macOS)
+
+On OSX you can install 'java' and `jbang` with https://brew.sh[Homebrew] using custom taps.
+
+To install Java 17:
+
+[source,bash]
+----
+brew install temurin@17 --cask
+----
+
+Once Java is installed you can use brew with https://github.com/jbangdev/homebrew-tap/[jbangdev/tap] to get `jbang`:
+
+[source,bash]
+----
+brew install jbangdev/tap/jbang
+----
+
+To upgrade to latest version:
+
+[source,bash]
+----
+brew upgrade jbangdev/tap/jbang
+----
+
+=== (Experimental) Linux packages icon:linux[]
+
+WARNING: These builds are not fully automated yet thus might be slightly behind.
+
+You can install rpm packages from https://copr.fedorainfracloud.org/coprs/maxandersen/jbang/[Fedora Copr]
+by doing the following:
+
+[source,bash]
+----
+dnf copr enable @jbangdev/jbang 
+dnf install jbang
+----
+
+The COPR currently includes builds from various versions of CentOS, Fedora, Mageia and OpenSuse.
+
+== Windows
+
+=== Chocolatey
+
+On Windows you can install both `java` and `jbang` with https://chocolatey.org[Chocolatey].
+
+From a command prompt with enough rights to install with choco:
+
+
+[source,powershell]
+----
+choco install jdk11
+----
+
+Once Java in installed run:
+
+[source,powershell]
+----
+choco install jbang
+----
+
+To upgrade to latest version:
+
+[source,powershell]
+----
+choco upgrade jbang
+----
+
+The latest package will be published to https://chocolatey.org/packages/jbang[jbang choco package page],
+it might be a bit delayed as the review is still manual. In case the default version is not
+the latest you can see the https://chocolatey.org/packages/jbang/#versionhistory[version list] and install specific version using:
+
+[source,powershell]
+----
+choco install jbang --version=<version number>
+----
+
+=== Scoop
+
+On Windows you can also install `jbang` with https://scoop.sh[Scoop].
+
+[source,powershell]
+----
+scoop bucket add jbangdev https://github.com/jbangdev/scoop-bucket
+scoop install jbang
+----
+
+To upgrade to latest version:
+
+[source,powershell]
+----
+scoop update jbang
+----
+
+== Homebrew icon:apple[]
+
+On OSX you can install 'java' and `jbang` with https://brew.sh[Homebrew] using custom taps.
+
+To install Java 11:
+
+[source, bash]
+----
+brew tap AdoptOpenJDK/openjdk
+brew install adoptopenjdk11 --cask
+----
+
+Once Java is installed you can use brew with https://github.com/jbangdev/homebrew-tap/[jbangdev/tap] to get `jbang`:
+
+[source,bash]
+----
+brew install jbangdev/tap/jbang
+----
+
+To upgrade to latest version:
+
+[source,bash]
+----
+brew upgrade jbangdev/tap/jbang
+----
+
+== (Experimental) Linux packages icon:linux[]
+
+WARNING: These builds are not fully automated yet thus might be slightly behind.
+
+You can install rpm packages from https://copr.fedorainfracloud.org/coprs/maxandersen/jbang/[Fedora Copr]
+by doing the following:
+
+[source,bash]
+----
+dnf copr enable @jbangdev/jbang 
+dnf install jbang
+----
+
+The COPR currently includes builds from various versions of CentOS, Fedora, Mageia and OpenSuse.
+
+== Docker / GitHub Action icon:docker[]
+
+You can run `jbang` via Docker:
+
+[source,bash]
+----
+docker run -v `pwd`:/ws --workdir=/ws -ti jbangdev/jbang-action helloworld.java
+----
+
+or if you prefer using Quay.io:
+
+[source,bash]
+----
+docker run -v `pwd`:/ws --workdir=/ws -ti quay.io/jbangdev/jbang-action helloworld.java
+----
+
+The same container images can be used with GitHub Actions, see https://github.com/jbangdev/jbang-action[jbang-action] for details.
+
+Remember to remove `-ti` from the commands above when using on a GitHub Actions flow.
+
+=== GitHub Actions
+
+You can use JBang in your GitHub Actions workflows:
+
+[source,yaml]
+----
+- name: Setup JBang
+  uses: jbangdev/setup-jbang@main
+
+- name: Run script
+  run: |
+    jbang properties@jbangdev
+----
+
+See https://github.com/marketplace/actions/setup-jbang for more details.
+
+== Build Tools
+
+=== Maven Plugin
+
+The JBang Maven plugin allows JBang scripts to be executed during a Maven build.
+
+Example in your `pom.xml`: 
+
+[source,xml]
+----
+<plugin>
+<groupId>dev.jbang</groupId>
+<artifactId>jbang-maven-plugin</artifactId>
+<version>0.0.8</version>
+<executions>
+  <execution>
+    <id>run</id>
+    <phase>process-resources</phase>
+    <goals>
+      <goal>run</goal>
+    </goals>
+    <configuration>
+        <script>hello.java</script>
+    </configuration>
+  </execution>
+</executions>
+</plugin>
+---- 
+
+The plugin documentation and more examples are available here: https://github.com/jbangdev/jbang-maven-plugin
+
+=== Gradle Plugin
+
+The JBang Gradle plugin allows JBang scripts to be executed during a Gradle build.
+
+In your `build.gradle` file, add:
+
+[source,groovy]
+----
+plugins {
+    id 'dev.jbang' version '0.2.0'
+}
+----
+
+That will allow you to execute JBang scripts with:
+
+[source,bash]
+----
+$ gradle jbang --jbang-script hello.jsh --jbang-args="Hello world"
+----
+
+The plugin documentation and more examples are available here: https://github.com/jbangdev/jbang-gradle-plugin
+
+== Programming Language Integrations
+
+=== JavaScript/Node.js (npx/npm)
+
+You can use JBang via Node.js using npx or by installing the npm package:
+
+[source,bash]
+----
+npx @jbangdev/jbang app setup
+----
+
+Or add to your `package.json`:
+
+[source,json]
+----
+{
+  "devDependencies": {
+    "@jbangdev/jbang": "^0.1.4"
+  }
+}
+----
+
+And use in your scripts:
+
+[source,js]
+----
+// test.js:
+#! /usr/bin/env node
+const jbang = require('@jbangdev/jbang');
+jbang.exec('properties@jbangdev');
+----
+
+=== Python (pipx/uvx/pip)
+
+You can use JBang from Python environments:
+
+[source,bash]
+----
+pipx jbang app setup
+uvx jbang app setup
+----
+
+Or in a Jupyter notebook:
+
+[source,python]
+----
+!pip install jbang
+import jbang
+jbang.exec('properties@jbangdev')
+----
+

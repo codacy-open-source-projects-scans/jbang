@@ -1,0 +1,14 @@
+= Scripts for jbang demos
+
+To record run:
+
+`asciinema rec -c "./basic-jbang.sh" video`
+
+Strip long pauses:
+
+`asciinema-edit quantize --range 0.3 ./video > realvideo`
+
+when okey, upload:
+
+`asciinema upload realvideo`
+
