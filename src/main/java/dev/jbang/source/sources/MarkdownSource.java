@@ -8,10 +8,12 @@ import java.util.regex.Pattern;
 
 import org.jspecify.annotations.NonNull;
 
-import dev.jbang.cli.BaseCommand;
-import dev.jbang.cli.ExitException;
+import dev.jbang.ExitException;
 import dev.jbang.resources.ResourceRef;
 import dev.jbang.resources.resolvers.LiteralScriptResourceResolver;
+import dev.jbang.source.BuildContext;
+import dev.jbang.source.Builder;
+import dev.jbang.source.CmdGeneratorBuilder;
 import dev.jbang.source.Source;
 import dev.jbang.util.Util;
 
@@ -26,6 +28,11 @@ public class MarkdownSource extends JshSource {
 		return Type.markdown;
 	}
 
+	@Override
+	public Builder<CmdGeneratorBuilder> getBuilder(BuildContext ctx) {
+		return ctx.getProject().isJShell() ? super.getBuilder(ctx) : new JavaAppBuilder(ctx);
+	}
+
 	public static Source create(ResourceRef resourceRef, Function<String, String> replaceProperties) {
 		String scriptText = new MarkdownTransform().transformMarkdown(
 				Util.readFileContent(resourceRef.getFile()));
@@ -36,7 +43,7 @@ public class MarkdownSource extends JshSource {
 			resourceRef = LiteralScriptResourceResolver.stringToResourceRef(resourceRef.getOriginalResource(),
 					scriptText, null);
 		} catch (IOException e) {
-			throw new ExitException(BaseCommand.EXIT_UNEXPECTED_STATE,
+			throw new ExitException(ExitException.EXIT_UNEXPECTED_STATE,
 					"Could not cache script from markdown at " + resourceRef.getOriginalResource(), e);
 		}
 		return new MarkdownSource(resourceRef,

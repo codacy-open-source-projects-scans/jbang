@@ -3,6 +3,8 @@ package dev.jbang.dependencies;
 import static dev.jbang.util.Util.infoMsg;
 
 import java.io.Closeable;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,6 +22,7 @@ import org.eclipse.aether.artifact.DefaultArtifactType;
 import org.eclipse.aether.collection.CollectRequest;
 import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.metadata.Metadata;
+import org.eclipse.aether.repository.Authentication;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactDescriptorException;
 import org.eclipse.aether.resolution.ArtifactDescriptorRequest;
@@ -35,10 +38,12 @@ import org.eclipse.aether.resolution.VersionRangeResolutionException;
 import org.eclipse.aether.resolution.VersionRangeResult;
 import org.eclipse.aether.util.artifact.JavaScopes;
 import org.eclipse.aether.util.artifact.SubArtifact;
+import org.eclipse.aether.util.repository.AuthenticationBuilder;
 import org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
 
+import dev.jbang.ExitException;
 import dev.jbang.Settings;
-import dev.jbang.cli.ExitException;
+import dev.jbang.util.NetUtil;
 import dev.jbang.util.Util;
 
 import eu.maveniverse.maven.mima.context.Context;
@@ -159,8 +164,11 @@ public class ArtifactResolver implements Closeable {
 					ContextOverrides.AddRepositoriesOp.REPLACE) // ignore
 																// settings.xml
 																// reposes
-			.snapshotUpdatePolicy(builder.updateCache
-					? ContextOverrides.SnapshotUpdatePolicy.ALWAYS
+			.artifactUpdatePolicy(builder.updateCache
+					? ContextOverrides.UpdatePolicy.ALWAYS
+					: null)
+			.metadataUpdatePolicy(builder.updateCache
+					? ContextOverrides.UpdatePolicy.ALWAYS
 					: null)
 			.repositoryListener(listener);
 
@@ -187,7 +195,7 @@ public class ArtifactResolver implements Closeable {
 					.setRepositories(
 							context.remoteRepositories()));
 		} catch (ArtifactResolutionException e) {
-			Util.verboseMsg("Could not resolve sources for " + artifact.toString());
+			Util.verboseMsg("Could not resolve sources for " + artifact);
 		}
 	}
 
@@ -295,7 +303,7 @@ public class ArtifactResolver implements Closeable {
 				Set<String> ids = (Set<String>) session.getData()
 					.computeIfAbsent("ids", () -> new HashSet<>(depIds));
 				Set<String> printed = (Set<String>) session.getData()
-					.computeIfAbsent("printed", () -> new HashSet<>());
+					.computeIfAbsent("printed", HashSet::new);
 
 				String id = coord(groupId, artId, null, null, classifier);
 				if (!printed.contains(id)) {
@@ -317,7 +325,7 @@ public class ArtifactResolver implements Closeable {
 				if (version != null && !version.isEmpty()) {
 					res += ":" + version;
 				}
-				if (classifier != null && classifier.length() > 0) {
+				if (classifier != null && !classifier.isEmpty()) {
 					res += "-" + classifier;
 				}
 				if ("pom".equals(type)) {
@@ -381,9 +389,28 @@ public class ArtifactResolver implements Closeable {
 	}
 
 	private RemoteRepository toRemoteRepo(MavenRepo repo) {
-		return new RemoteRepository.Builder(repo.getId(), "default", repo.getUrl())
-			.build();
+		RemoteRepository.Builder builder = new RemoteRepository.Builder(repo.getId(), "default", repo.getUrl());
 
+		// Apply credentials from .netrc / env vars as a baseline.
+		// If ~/.m2/settings.xml also has a <server> entry whose ID matches
+		// this repository's ID, MIMA's AuthenticationSelector will override
+		// the netrc auth during newResolutionRepositories() — which is the
+		// correct precedence (Maven-native config wins).
+		try {
+			URL url = new URL(repo.getUrl());
+			String[] creds = NetUtil.getCredentialsForHost(url.getHost());
+			if (creds != null) {
+				Authentication auth = new AuthenticationBuilder()
+					.addUsername(creds[0])
+					.addPassword(creds[1])
+					.build();
+				builder.setAuthentication(auth);
+			}
+		} catch (MalformedURLException e) {
+			Util.verboseMsg("Could not parse repository URL for auth lookup: " + repo.getUrl());
+		}
+
+		return builder.build();
 	}
 
 	private static Dependency toDependency(Artifact artifact) {
@@ -413,7 +440,7 @@ public class ArtifactResolver implements Closeable {
 	private static ArtifactInfo toArtifactInfo(Artifact artifact) {
 		MavenCoordinate coord = new MavenCoordinate(artifact.getGroupId(), artifact.getArtifactId(),
 				artifact.getVersion(), artifact.getClassifier(), artifact.getExtension());
-		return new ArtifactInfo(coord, artifact.getFile().toPath());
+		return new ArtifactInfo(coord, artifact.getPath());
 	}
 
 	public static Path getLocalMavenRepo() {
@@ -421,8 +448,7 @@ public class ArtifactResolver implements Closeable {
 			return ar.context
 				.repositorySystemSession()
 				.getLocalRepository()
-				.getBasedir()
-				.toPath();
+				.getBasePath();
 		}
 	}
 }

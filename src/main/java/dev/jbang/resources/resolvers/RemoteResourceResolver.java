@@ -14,7 +14,7 @@ import java.util.function.Function;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import dev.jbang.cli.ExitException;
+import dev.jbang.ExitException;
 import dev.jbang.net.TrustedSources;
 import dev.jbang.resources.ResourceNotFoundException;
 import dev.jbang.resources.ResourceRef;
@@ -78,7 +78,7 @@ public class RemoteResourceResolver implements ResourceResolver {
 				options.add("Trust organization url in future: " + trustOrgUrl);
 			}
 
-			int result = Util.askInput(question, 30, 0, options.toArray(new String[] {}));
+			int result = Util.askInput(question, Util.getAskInputTimeout(), 0, options.toArray(new String[] {}));
 			TrustedSources ts = TrustedSources.instance();
 			if (result == 1) {
 				ts.addTemporary(trustUrl);

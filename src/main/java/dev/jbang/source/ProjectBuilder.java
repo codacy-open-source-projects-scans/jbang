@@ -23,16 +23,12 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 
-import org.apache.maven.model.Model;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NonNull;
 
+import dev.jbang.ExitException;
 import dev.jbang.Settings;
 import dev.jbang.catalog.Alias;
 import dev.jbang.catalog.Catalog;
-import dev.jbang.cli.BaseCommand;
-import dev.jbang.cli.ExitException;
 import dev.jbang.dependencies.DependencyResolver;
 import dev.jbang.dependencies.DependencyUtil;
 import dev.jbang.dependencies.Detector;
@@ -59,6 +55,12 @@ import dev.jbang.util.ModuleUtil;
 import dev.jbang.util.PropertiesValueResolver;
 import dev.jbang.util.Util;
 
+import eu.maveniverse.domtrip.Document;
+import eu.maveniverse.domtrip.DomTripException;
+import eu.maveniverse.domtrip.Element;
+import eu.maveniverse.domtrip.maven.MavenPomElements;
+import eu.maveniverse.domtrip.maven.PomEditor;
+
 /**
  * This class constructs a <code>Project</code>. It uses the options given by
  * the user on the command line or things that are part of the user's
@@ -71,6 +73,10 @@ public class ProjectBuilder {
 	private List<String> additionalRepos = new ArrayList<>();
 	private List<String> additionalClasspaths = new ArrayList<>();
 	private Map<String, String> properties = new HashMap<>();
+	// Snapshot of the caller/command-line (-D) properties taken before any alias
+	// properties are merged in, so we can tell an explicit -D from an alias
+	// default.
+	private Map<String, String> explicitProperties = Collections.emptyMap();
 	private Source.Type forceType = null;
 	private String mainClass;
 	private String moduleName;
@@ -259,6 +265,9 @@ public class ProjectBuilder {
 	}
 
 	public Project build(String resource) {
+		// Capture the caller/-D properties before alias resolution merges alias
+		// properties into `properties`, so version precedence can distinguish them.
+		explicitProperties = new HashMap<>(properties);
 		ResourceRef resourceRef = resolveChecked(getResourceResolver(), resource);
 		return build(resourceRef);
 	}
@@ -272,7 +281,7 @@ public class ProjectBuilder {
 		try {
 			ref = resolver.resolve(resource);
 		} catch (ExitException ee) {
-			if (ee.getStatus() != BaseCommand.EXIT_INVALID_INPUT || !retryCandidate) {
+			if (ee.getStatus() != ExitException.EXIT_INVALID_INPUT || !retryCandidate) {
 				throw ee;
 			}
 		}
@@ -285,7 +294,7 @@ public class ProjectBuilder {
 			ref = Util.withCacheEvict(() -> resolver.resolve(resource));
 		}
 		if (ref == null || !Files.isReadable(ref.getFile())) {
-			throw new ExitException(BaseCommand.EXIT_INVALID_INPUT,
+			throw new ExitException(ExitException.EXIT_INVALID_INPUT,
 					"Script or alias could not be found or read: '" + resource + "'");
 		}
 		Util.verboseMsg("Resolved resource ref as: " + ref);
@@ -300,8 +309,30 @@ public class ProjectBuilder {
 
 	public Project build(ResourceRef resourceRef) {
 		if (!buildRefs.add(resourceRef)) {
-			throw new ExitException(BaseCommand.EXIT_INVALID_INPUT,
+			throw new ExitException(ExitException.EXIT_INVALID_INPUT,
 					"Self-referencing project dependency found for: '" + resourceRef.getOriginalResource() + "'");
+		}
+
+		// Expose an explicit alias:version to the running script as
+		// -Djbang.app.version=<version>
+		// (part of the reserved jbang.app.* namespace; mirrors the JBANG_APP_* env
+		// inputs).
+		if (resourceRef instanceof AliasResourceResolver.AliasedResourceRef) {
+			String requestedVersion = ((AliasResourceResolver.AliasedResourceRef) resourceRef).getRequestedVersion();
+			if (requestedVersion != null) {
+				if (explicitProperties.containsKey("jbang.app.version")) {
+					// An explicit -Djbang.app.version=<version> wins over the alias:version
+					// selector (which in turn overrides the alias properties-block default).
+					Util.verboseMsg("Keeping explicit -Djbang.app.version="
+							+ explicitProperties.get("jbang.app.version")
+							+ "; not clobbering it with alias version '" + requestedVersion + "'");
+				} else {
+					Map<String, String> merged = new HashMap<>(properties); // properties may be shared/immutable
+					merged.put("jbang.app.version", requestedVersion);
+					properties = merged;
+					contextProperties = null; // reset cached context so the new property is picked up
+				}
+			}
 		}
 
 		Project prj;
@@ -321,6 +352,7 @@ public class ProjectBuilder {
 		if (resourceRef.getOriginalResource() != null
 				&& DependencyUtil.looksLikeAGav(resourceRef.getOriginalResource())) {
 			prj.getMainSourceSet().addDependency(resourceRef.getOriginalResource());
+			prj.setResolvedClassPath(mcp);
 		}
 		return updateProject(importJarMetadata(prj, moduleName != null && moduleName.isEmpty()));
 	}
@@ -453,19 +485,44 @@ public class ProjectBuilder {
 				Optional<JarEntry> pom = jf.stream().filter(e -> e.getName().endsWith("/pom.xml")).findFirst();
 				if (pom.isPresent()) {
 					try (InputStream is = jf.getInputStream(pom.get())) {
-						MavenXpp3Reader reader = new MavenXpp3Reader();
-						Model model = reader.read(is);
+						Document document = Document.of(is);
+						PomEditor pomEditor = new PomEditor(document);
+						Element root = pomEditor.root();
+
+						String groupId = root.childTextOr(MavenPomElements.Elements.GROUP_ID, null);
+						String artifactId = root.childTextOr(MavenPomElements.Elements.ARTIFACT_ID, null);
+						String version = root.childTextOr(MavenPomElements.Elements.VERSION, null);
+
+						// ArtifactId is always required
+						if (artifactId == null) {
+							throw new DomTripException("Malformed POM: artifactId is required but not found");
+						}
+
+						// Try to get groupId and version from parent if not present
+						if (groupId == null || version == null) {
+							Element parent = pomEditor.findChildElement(root, MavenPomElements.Elements.PARENT);
+							if (parent != null) {
+								if (groupId == null) {
+									groupId = parent.childTextOr(MavenPomElements.Elements.GROUP_ID, null);
+								}
+								if (version == null) {
+									version = parent.childTextOr(MavenPomElements.Elements.VERSION, null);
+								}
+							}
+							// Note: We don't throw if groupId or version is still null - Maven 4 can infer
+							// these
+						}
 						// GAVS of the form "group:xxxx:999-SNAPSHOT" are skipped
-						if (!MavenCoordinate.DUMMY_GROUP.equals(model.getGroupId())
-								|| !MavenCoordinate.DEFAULT_VERSION.equals(model.getVersion())) {
-							String gav = model.getGroupId() + ":" + model.getArtifactId();
+						if (!MavenCoordinate.DUMMY_GROUP.equals(groupId)
+								|| !MavenCoordinate.DEFAULT_VERSION.equals(version)) {
+							String gav = groupId + ":" + artifactId;
 							// The version "999-SNAPSHOT" is ignored
-							if (!MavenCoordinate.DEFAULT_VERSION.equals(model.getVersion())) {
-								gav += ":" + model.getVersion();
+							if (!MavenCoordinate.DEFAULT_VERSION.equals(version)) {
+								gav += ":" + version;
 							}
 							prj.setGav(gav);
 						}
-					} catch (XmlPullParserException e) {
+					} catch (DomTripException e) {
 						Util.verboseMsg("Unable to read the JAR's pom.xml file", e);
 					}
 				}
@@ -750,8 +807,12 @@ public class ProjectBuilder {
 		if (additionalClasspaths.isEmpty()) {
 			additionalClasspaths(alias.classpaths);
 		}
-		if (properties.isEmpty()) {
-			setProperties(alias.properties);
+		if (alias.properties != null && !alias.properties.isEmpty()) {
+			// Merge per-key: alias properties are defaults, caller/-D properties win.
+			Map<String, String> merged = new HashMap<>(alias.properties);
+			merged.putAll(properties);
+			properties = merged;
+			contextProperties = null;
 		}
 		if (javaVersion == null) {
 			javaVersion(alias.javaVersion);

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import dev.jbang.cli.ExitException;
 import dev.jbang.devkitman.Jdk;
 import dev.jbang.devkitman.JdkManager;
 import dev.jbang.util.JavaUtil;
@@ -30,7 +29,7 @@ public class Cache {
 				// We're running using a managed JDK on Windows so we can't just delete the
 				// entire folder!
 				for (Jdk.InstalledJdk jdk : jdkMan.listInstalledJdks()) {
-					jdkMan.uninstallJdk(jdk);
+					jdk.uninstall();
 				}
 			}
 			if (cc == CacheClass.deps) {

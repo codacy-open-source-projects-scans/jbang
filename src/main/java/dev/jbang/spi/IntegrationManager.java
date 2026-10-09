@@ -1,7 +1,7 @@
 package dev.jbang.spi;
 
-import static dev.jbang.cli.BaseCommand.EXIT_GENERIC_ERROR;
-import static dev.jbang.cli.BaseCommand.EXIT_INVALID_INPUT;
+import static dev.jbang.ExitException.EXIT_GENERIC_ERROR;
+import static dev.jbang.ExitException.EXIT_INVALID_INPUT;
 import static dev.jbang.util.JavaUtil.resolveInJavaHome;
 
 import java.io.BufferedReader;
@@ -32,7 +32,7 @@ import org.jspecify.annotations.NonNull;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import dev.jbang.cli.ExitException;
+import dev.jbang.ExitException;
 import dev.jbang.dependencies.ArtifactInfo;
 import dev.jbang.dependencies.MavenRepo;
 import dev.jbang.devkitman.Jdk;
@@ -245,12 +245,11 @@ public class IntegrationManager {
 		Path jbangJar = Util.getJarLocation();
 		args.add("-cp");
 
-		String suffix = Util.isWindows() ? ".bin.exe" : ".bin";
 		if (JavaUtil.inNativeImage()
-				&& (jbangJar.toString().endsWith(suffix))) {
-			// quick'n dirty way to get the native image to work
-			// TODO: check if the jar is present and if not, throw descriptive error
-			args.add(jbangJar.toString().replace(suffix, ".jar"));
+				&& !jbangJar.toString().endsWith(".jar")) {
+			// When running as native image, find the jar in the same directory
+			Path jarPath = jbangJar.getParent().resolve("jbang.jar");
+			args.add(jarPath.toString());
 		} else {
 			if (jbangJar.toString().endsWith(".jar")) {
 				args.add(jbangJar.toString());
